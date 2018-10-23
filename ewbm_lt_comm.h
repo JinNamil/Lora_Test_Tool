@@ -23,6 +23,17 @@ typedef enum LoraCommandNameNum {
 	Lora_command_MAX
 } LoraCommandNameNum;
 
+typedef enum TxRx_t{
+	TxRxTest_1 = 0,
+	TxRxTest_2
+}TxRx_t;
+
+typedef enum Edit_t{
+	EditType = 0,
+	EditDefault,
+	EditStart
+}Edit_t;
+
 typedef enum Target_t{
 	TARGET_1 = 0,
 	TARGET_2,
@@ -46,6 +57,11 @@ static const char LoraCommandName[Lora_command_MAX][64] = {
 	"CFM",
 	"ECHO",
 	"DEVEUI"
+};
+
+static const char LoraTxRxName[2][64] = {
+	"TXST",
+	"RXST"
 };
 
 static char LoraCommandList[Lora_command_MAX][128] = {
@@ -88,23 +104,22 @@ static char LoraCommand[Lora_command_MAX][64] = {
 	"AT+DEVEUI"
 };
 
-static char LoraTxRxTest[2][64] = {
-	"AT+TXST 922500000 14 7 10 1",
-	"AT+RXST 922500000 7"
+static char LoraTxRxTestCommand[2][64] = {
+	"AT+TXST",
+	"AT+RXST"
 };
-static char LoraCommandSave[Lora_command_MAX][64] = {0,};
-static int LoraCommanTemp;
-static int ltCommSend(unsigned char* in, unsigned int inLen);
-int lora_test_cmp(int j, int type);
-int lora_test_cmp_t(int j);
-int lora_test_init(void);
-int Comm_compare(char* command, int list_num);
-int lora_comm_edit(int num, uint8_t** read);
-int lora_comm_send(int num, uint8_t** read);
-int TotalCmp(void);
-int lora_test_comm(int type);
-//int Lora_command_init(void);
-int test(void);
-int Lora_command_init(int RecvLen, char* RecvBuffer, int num);
-int lora_txrx_test(int tar, int change);
-int lora_test_edit(int commandNum, int count);
+
+static char LoraTxRxValue[2][64] = {
+	"922500000 14 7 10 1\r\n",
+	"922500000 7\r\n"
+};
+
+static int LoraCommSend(unsigned char* in, unsigned int inLen, int target);
+int LoraTestCmp(int j, int type);
+int LoraTestInit(void);
+int LoraCommCompare(char* command, int list_num);
+int LoraBootStatus(void);
+int LoraCommRead(int num, uint8_t** read);
+int LoraTestStart(int type);
+int LoraCommandEdit(int RecvLen, char* RecvBuffer);
+int LoraTxRxTest(int tar, int change);

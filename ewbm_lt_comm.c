@@ -8,50 +8,47 @@
 uint8_t* readed = {0,};
 unsigned int readLen = 0;
 int gLoraRecvLen = 0;
-int gLoraRecvLen_t = 0;
 unsigned char gLoraBuffer[64] = { 0, };
 unsigned char CommReceiveBuffer[Lora_command_MAX] = {0, };
-static void ltCommReceive(void* param)
+
+static void LoraCommReceive(void* param)
 {
     gLoraBuffer[gLoraRecvLen++] = UART_Read(UART3);
 }
 
-static void ltCommReceive_t(void* param)
+static void LoraCommReceive_t(void* param)
 {
     gLoraBuffer[gLoraRecvLen++] = UART_Read(UART1);
 }
 
-static int ltCommSend(unsigned char* in, unsigned int inLen)
+static int LoraCommSend(unsigned char* in, unsigned int inLen, int target)
 {
 	int ret = -1;
-	for(int i = 0; i<inLen+2; i++)
-	{
-		UART_Write(UART3, in[i]);
-	}
 	
-	UART_Write(UART3, '\r');
-	UART_Write(UART3, '\n');
+	if(target == TARGET_1)
+	{
+		for(int i = 0; i<inLen+2; i++)
+		{
+			UART_Write(UART3, in[i]);
+		}
+		UART_Write(UART3, '\r');
+		UART_Write(UART3, '\n');
+	}
+	else if(target == TARGET_2)
+	{
+		for(int i = 0; i<inLen+2; i++)
+		{
+			UART_Write(UART1, in[i]);
+		}
+		UART_Write(UART1, '\r');
+		UART_Write(UART1, '\n');
+	}
 	
 	ret = 0;
     return ret;
 }
 
-static int ltCommSend_t(unsigned char* in, unsigned int inLen)
-{
-	int ret = -1;
-	for(int i = 0; i<inLen+2; i++)
-	{
-		UART_Write(UART1, in[i]);
-	}
-	
-	UART_Write(UART1, '\r');
-	UART_Write(UART1, '\n');
-	
-	ret = 0;
-    return ret;
-}
-
-int Comm_compare(char* command, int list_num)
+int LoraCommCompare(char* command, int list_num)
 {
 	int ret = -1;
 	
@@ -63,74 +60,114 @@ int Comm_compare(char* command, int list_num)
 	return ret;
 }
 
-int Lora_command_init(int RecvLen, char* RecvBuffer, int num)
+int LoraBootStatus(void)
+{
+	int status_1;
+	int status_2;
+
+	GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
+	GPIO_WritePin(GPIO1, GPIO_PIN_1, 0);
+	DELAY_SleepMS(1);
+	GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
+	
+	GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+	GPIO_WritePin(GPIO1, GPIO_PIN_2, 0);
+	DELAY_SleepMS(1);
+	GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+	
+	DELAY_SleepMS(500);
+	status_1 = GPIO_ReadPin(GPIO2, GPIO_PIN_10);
+	status_2 = GPIO_ReadPin(GPIO3, GPIO_PIN_6);
+	
+	if(status_1 == 1 && status_2 == 1)
+	{
+		PRINTF("-----------------------------------------------\r\n");
+		PRINTF("                 Boot Complete\r\n");
+		PRINTF("-----------------------------------------------\r\n\r\n\r\n");
+		status_1 = 0;
+		status_2 = 0;
+		
+		return 0;
+	}
+	return -1;
+}
+
+int LoraCommandEdit(int RecvLen, char* RecvBuffer)
 {
 	char* result = {0,};
 	int CommNum = -1;
+	int txrx = 0;
+	char txrxResult[64] = {0,};
 	DELAY_SleepMS(100);
 	
-	if(num == 1)
+	/* TxRx compare */
+	if(memcmp(LoraTxRxName[0], RecvBuffer, strlen(LoraTxRxName[0])) == 0)
 	{
-		result = strtok(RecvBuffer, " ");
-
-		for(int i=0; i<Lora_command_MAX; i++)
-		{
-			if(memcmp(LoraCommandName[i], result, strlen(LoraCommandName[i])) == 0)
-			{
-				CommNum = i;
-				goto Lora_command_init;
-			}
-		}
-Lora_command_init:
-		
-		
-		if(memcmp(RecvBuffer, "TYPE", 4) == 0)
-		{
-			PRINTF("-----------------TYPE change-----------------\r\n");
-			return 0;
-		}
-		else if(memcmp(RecvBuffer, "START", 5) == 0)
-		{
-			PRINTF("-----------------START-----------------\r\n");
-			return 3;
-		}
-		if(CommNum == -1)
-		{
-			PRINTF("NOT Command\r\n");
-			return 1;
-		}
-		
-		PRINTF("Command Name: %s\r\n", result);
-		result = strtok(NULL, " ");
-		PRINTF("Command Value: %s\r\n", result);
-		
-		memset(LoraCommandList[CommNum], 0, strlen(LoraCommandList[CommNum]));
-		sprintf(LoraCommandList[CommNum], "%s", result);
-//		PRINTF("Complete Command Edit Value is %s\r\n", LoraCommandList[CommNum]);
-		PRINTF("Default Edit Complete\r\n");
-		return 1;
+		memcpy(txrxResult, RecvBuffer+(strlen(LoraTxRxName[0])+1), strlen(LoraTxRxValue[0]));
+		memset(LoraTxRxValue[0], 0, strlen(LoraTxRxValue[0]));
+		sprintf(LoraTxRxValue[0], "%s", txrxResult);
+		memcpy(LoraTxRxValue[1], LoraTxRxValue[0], 9);
+		memcpy(LoraTxRxValue[1]+10, LoraTxRxValue[0]+13, 1);
+		PRINTF("TXST Value: %s\r\n", LoraTxRxValue[0]);
+		PRINTF("RXST Value: %s\r\n", LoraTxRxValue[1]);
+		PRINTF("TXST RXST Default Edit Change Complete\r\n");
+		return EditDefault;
+	}
+	else if(memcmp(LoraTxRxName[1], RecvBuffer, strlen(LoraTxRxName[1])) == 0)
+	{
+		memcpy(txrxResult, RecvBuffer+(strlen(LoraTxRxName[1])+1), strlen(LoraTxRxValue[1]));
+		memset(LoraTxRxValue[1], 0, strlen(LoraTxRxValue[1]));
+		sprintf(LoraTxRxValue[1], "%s", txrxResult);
+		memcpy(LoraTxRxValue[0], LoraTxRxValue[1], 9);
+		memcpy(LoraTxRxValue[0]+13, LoraTxRxValue[1]+10, 1);
+		PRINTF("TXST Value: %s\r\n", LoraTxRxValue[0]);
+		PRINTF("RXST Value: %s\r\n", LoraTxRxValue[1]);
+		PRINTF("RXST TXST Default Edit Change Complete\r\n");
+		return EditDefault;
 	}
 	
+	result = strtok(RecvBuffer, " ");
 
-//	if(memcmp(RecvBuffer, "exit", 4) == 0)
-//	{
-//		PRINTF("------------------EXIT------------------\r\n");
-//		return 0;
-//	}
-//	else if(memcmp(RecvBuffer, "change", 6) == 0)
-//	{
-//		return 2;
-//	}
-//	else if(memcmp(RecvBuffer, "edit", 4) == 0)
-//	{
-//		PRINTF("Please Edit Typing...(CommandName CommandValue)\r\n");
-//		return 3;
-//	}
+	for(int i=0; i<Lora_command_MAX; i++)
+	{
+		if(memcmp(LoraCommandName[i], result, strlen(LoraCommandName[i])) == 0)
+		{
+			CommNum = i;
+			goto LoraCommandEdit;
+		}
+	}
+LoraCommandEdit:
+	
+	/* TYPE and START Command */
+	if(memcmp(RecvBuffer, "TYPE", 4) == 0)
+	{
+		PRINTF("-----------------TYPE change-----------------\r\n");
+		return EditType;
+	}
+	else if(memcmp(RecvBuffer, "START", 5) == 0)
+	{
+		PRINTF("-----------------START-----------------\r\n");
+		return EditStart;
+	}
+	
+	if(CommNum == -1)
+	{
+		PRINTF("NOT Command\r\n");
+		return EditDefault;
+	}
 	
 	
+	PRINTF("Command Name: %s\r\n", result);
+	result = strtok(NULL, " ");
+	PRINTF("Command Value: %s\r\n", result);
+	
+	memset(LoraCommandList[CommNum], 0, strlen(LoraCommandList[CommNum]));
+	sprintf(LoraCommandList[CommNum], "%s", result);
+	PRINTF("Default Edit Complete\r\n");
+	return EditDefault;
 }
 
-int lora_comm_send(int num, uint8_t** read)
+int LoraCommRead(int num, uint8_t** read)
 {
 	int ret = -1;
 	uint8_t* send_mes = {0,};
@@ -149,14 +186,14 @@ int lora_comm_send(int num, uint8_t** read)
 	return ret;
 }
 
-int lora_test_init(void)
+int LoraTestInit(void)
 {
 	int ret = -1;
 	
-	UART_InterruptSetCallback(UART1, UART_INT_MASK_RX, ltCommReceive_t, NULL);
+	UART_InterruptSetCallback(UART1, UART_INT_MASK_RX, LoraCommReceive_t, NULL);
 	UART_InterruptEnable(UART1, UART_INT_MASK_RX);
 	
-	UART_InterruptSetCallback(UART3, UART_INT_MASK_RX, ltCommReceive, NULL);
+	UART_InterruptSetCallback(UART3, UART_INT_MASK_RX, LoraCommReceive, NULL);
 	UART_InterruptEnable(UART3, UART_INT_MASK_RX);
  
 	
@@ -165,19 +202,23 @@ int lora_test_init(void)
 	{
 		PRINTF("%s: %s",LoraCommandName[a], LoraCommandList[a]);
 	}
-	PRINTF("------------------Lora Init--------------------\r\n\r\n\r\n");
+	for(int i = 0; i<2; i++)
+	{
+		PRINTF("%s: %s",LoraTxRxName[i], LoraTxRxValue[i]);
+	}
+	PRINTF("------------------Lora Init--------------------\r\n");
 		
 	return 0;
 }
 
-int lora_test_cmp(int j, int type)
+int LoraTestCmp(int j, int type)
 {
-	int ret = 0;
+	int ret = -1;
 	int fail_count = 0;
 	unsigned char ltCommReceiveTemp[64] = {0,};
 	unsigned char ptr[64] = {0, };
 	
-	ret = Comm_compare(gLoraBuffer, j);
+	ret = LoraCommCompare(gLoraBuffer, j);
 	if(ret == 0)
 	{
 		DELAY_SleepMS(10);
@@ -192,10 +233,7 @@ int lora_test_cmp(int j, int type)
 			
 			while(1)
 			{
-				GPIO_TogglePin(GPIO2, GPIO_PIN_11);
 				GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-				GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-				GPIO_TogglePin(GPIO2, GPIO_PIN_14);
 				DELAY_SleepMS(200);
 			}
 		}
@@ -214,22 +252,19 @@ int lora_test_cmp(int j, int type)
 			
 			while(1)
 			{
-				GPIO_TogglePin(GPIO2, GPIO_PIN_11);
 				GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-				GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-				GPIO_TogglePin(GPIO2, GPIO_PIN_14);
 				DELAY_SleepMS(200);
 			}
 		}
 		else if(j == DEVEUI)
 		{
 			PRINTF("%s <OK>\r\n",LoraCommandName[j]);
-			goto lora_test_cmp;
+			goto LoraTestCmp;
 		}
 		
 		
 		memcpy(ltCommReceiveTemp, gLoraBuffer, strlen(LoraCommandList[j]));
-		PRINTF("\r\n%s [FAIL]\r\n[Current Value]:%s\r\nTyping Please: %s %s\r\n",LoraCommandName[j], ltCommReceiveTemp, LoraCommand[j], LoraCommandList[j]);
+		PRINTF("\r\n[Current Value]:%s\r\n%s Value Change: %s\r\n", ltCommReceiveTemp, LoraCommandName[j], LoraCommandList[j]);
 		
 		fail_count++;
 	}
@@ -237,14 +272,14 @@ int lora_test_cmp(int j, int type)
 	{
 		PRINTF("%s is change\r\n", LoraCommandName[j]);
 		sprintf(ptr, "%s %s", LoraCommand[j], LoraCommandList[j]);
-//		strcat(LoraCommand[j], ltCommReceiveTemp);
+		
 		if(type == 0)
 		{
-			ret = ltCommSend(ptr, strlen(ptr));
+			ret = LoraCommSend(ptr, strlen(ptr), TARGET_1);
 		}
 		else
 		{
-			ret = ltCommSend_t(ptr, strlen(ptr));
+			ret = LoraCommSend(ptr, strlen(ptr), TARGET_2);
 		}
 		
 		while ( gLoraRecvLen < 5 )
@@ -253,107 +288,107 @@ int lora_test_cmp(int j, int type)
 		DELAY_SleepMS(100);
 	}
 	
-lora_test_cmp:
+LoraTestCmp:
 	memset(gLoraBuffer, 0, strlen(gLoraBuffer));
 	memset(ltCommReceiveTemp, 0, strlen(ltCommReceiveTemp));
 	
 	return fail_count;
 }
 
-int lora_test_edit(int commandNum, int count)
+int LoraTxRxTest(int tar, int change)
 {
-	int edit_count = 0;
-	int ret;
-	memset(gLoraBuffer, 0, sizeof(gLoraBuffer));
-	
-	for(int i = 0; i<10; i++)
-	{
-		GPIO_TogglePin(GPIO2, GPIO_PIN_11);
-		GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-		GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-		GPIO_TogglePin(GPIO2, GPIO_PIN_14);
-		DELAY_SleepMS(200);
-	}
-	
-	do{
-		gLoraRecvLen = 0;
-		PRINTF("Please edit message...\r\n");
-		while ( gLoraRecvLen < strlen(LoraCommandList[commandNum]) )
-				__NOP();
-				
-		PRINTF("--------VALUE---------\r\n");
-		PRINTF("%s", gLoraBuffer);
-		PRINTF("----------------------\r\n");
-		memset(gLoraBuffer, 0, strlen(gLoraBuffer));
-		edit_count++;
-	}while(edit_count != count);
-	
-	ret = 0;
-	return ret;
-}
-
-int lora_txrx_test(int tar, int change)
-{
+	int timeout = 0;
 	char* ptr;
+	char result[64] = {0, };
 	int ret = -1;
 	gLoraRecvLen = 0;
 	memset(gLoraBuffer, 0, strlen(gLoraBuffer));
-	if(change == 0)
+	if(change == TxRxTest_1)
 	{
-		if(tar == 0)
+		if(tar == TARGET_1)
 		{
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
-			ret = ltCommSend_t(LoraTxRxTest[0], strlen(LoraTxRxTest[0]));
+			sprintf(result, "%s %s", LoraTxRxTestCommand[0], LoraTxRxValue[0]);
+			ret = LoraCommSend(result, strlen(result), TARGET_2);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 			
 			while ( gLoraRecvLen <  74 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
-				
+			}
+			
 			DELAY_SleepMS(1000);
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, strlen(gLoraBuffer));
 			
 			while ( gLoraRecvLen < 18 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 				
 			DELAY_SleepMS(100);
 				
-	//		PRINTF("buffer: %sbufferLen: %d\r\n", gLoraBuffer, gLoraRecvLen);
 			ptr = strtok(gLoraBuffer, " ");
 			ptr = strtok(NULL, " ");
 			if(memcmp(ptr, "transmitted\r\n", strlen(ptr)) == 0)
 			{
-				PRINTF("TX Test COMPLETE\r\n");
+				PRINTF("(TARGET2)TX Test COMPLETE\r\n");
 				ret = 0;
 			}
 			else
 			{
-				PRINTF("TX Message: %s\r\n", ptr);
-				PRINTF("TX Test FAIL\r\n");
+				PRINTF("(TARGET2)TX Message: %s\r\n", ptr);
+				PRINTF("(TARGET2)TX Test FAIL\r\n");
 				ret = -1;
 			}
-			
 			
 			UART_InterruptDisable(UART1, UART_INT_MASK_RX);
 			
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
+			memset(result, 0, strlen(result));
 		}
-		else if(tar == 1)
+		else if(tar == TARGET_2)
 		{
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
 			
 			ptr = NULL;
-			
-			ret = ltCommSend(LoraTxRxTest[1], strlen(LoraTxRxTest[1]));
+			sprintf(result, "%s %s", LoraTxRxTestCommand[1], LoraTxRxValue[1]);
+			ret = LoraCommSend(result, strlen(result), TARGET_1);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 
 			while ( gLoraRecvLen < 5 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 			
 			
 			DELAY_SleepMS(1000);
@@ -361,65 +396,96 @@ int lora_txrx_test(int tar, int change)
 			memset(gLoraBuffer, 0, 64);
 			
 			while ( gLoraRecvLen < 20 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 				
 			DELAY_SleepMS(100);
 			
-	//		PRINTF("buffer: %s\r\nbufferLen: %d\r\n", gLoraBuffer, gLoraRecvLen);
 			ptr = strtok(gLoraBuffer, " ");
 			ptr = strtok(NULL, " ");
 			ptr = strtok(NULL, " ");
 			if(memcmp(ptr, "error\r\n", strlen(ptr)) != 0 || memcmp(ptr, NULL, strlen(ptr)) != 0)
 			{
-				PRINTF("RX Test COMPLETE\r\n");
+				PRINTF("(TARGET1)RX Test COMPLETE\r\n");
 				ret = 0;
 			}
 			else
 			{
-				PRINTF("RX Test FAIL\r\n");
-				PRINTF("RX Buffer:%s\r\n", ptr);
+				PRINTF("(TARGET1)RX Test FAIL\r\n");
+				PRINTF("(TARGET1)RX Buffer:%s\r\n", ptr);
 				ret = -1;
 			}
 			UART_InterruptEnable(UART1, UART_INT_MASK_RX);
 			
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
+			memset(result, 0, strlen(result));
 		}
 	}
-	else if(change == 1)
+	else if(change == TxRxTest_2)
 	{
-		if(tar == 0)
+		if(tar == TARGET_1)
 		{
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
-			ret = ltCommSend(LoraTxRxTest[0], strlen(LoraTxRxTest[0]));
+			
+			sprintf(result, "%s %s", LoraTxRxTestCommand[0], LoraTxRxValue[0]);
+			ret = LoraCommSend(result, strlen(result), TARGET_1);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 			
 			while ( gLoraRecvLen <  74 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 				
 			DELAY_SleepMS(1000);
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, strlen(gLoraBuffer));
 			
 			while ( gLoraRecvLen < 18 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 				
 			DELAY_SleepMS(100);
 				
-	//		PRINTF("buffer: %sbufferLen: %d\r\n", gLoraBuffer, gLoraRecvLen);
 			ptr = strtok(gLoraBuffer, " ");
 			ptr = strtok(NULL, " ");
 			if(memcmp(ptr, "transmitted\r\n", strlen(ptr)) == 0)
 			{
-				PRINTF("TX Test COMPLETE\r\n");
+				PRINTF("(TARGET1)TX Test COMPLETE\r\n");
 				ret = 0;
 			}
 			else
 			{
-				PRINTF("TX Message: %s\r\n", ptr);
-				PRINTF("TX Test FAIL\r\n");
+				PRINTF("(TARGET1)TX Message: %s\r\n", ptr);
+				PRINTF("(TARGET1)TX Test FAIL\r\n");
 				ret = -1;
 			}
 			
@@ -428,20 +494,32 @@ int lora_txrx_test(int tar, int change)
 			
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
+			memset(result, 0, strlen(result));
 		}
-		else if(tar == 1)
+		else if(tar == TARGET_2)
 		{
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
 			
 			ptr = NULL;
 			
-			ret = ltCommSend_t(LoraTxRxTest[1], strlen(LoraTxRxTest[1]));
+			sprintf(result, "%s %s", LoraTxRxTestCommand[1], LoraTxRxValue[1]);
+			ret = LoraCommSend(result, strlen(result), TARGET_2);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 
 			while ( gLoraRecvLen < 5 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 			
 			
 			DELAY_SleepMS(1000);
@@ -449,34 +527,44 @@ int lora_txrx_test(int tar, int change)
 			memset(gLoraBuffer, 0, 64);
 			
 			while ( gLoraRecvLen < 20 )
+			{
+				DELAY_SleepMS(1);
+				timeout++;
+				if(timeout > 5000)
+				{
+					PRINTF("time out!!\r\n");
+					timeout = 0;
+					return -1;
+				}
 				__NOP();
+			}
 				
 			DELAY_SleepMS(100);
 			
-	//		PRINTF("buffer: %s\r\nbufferLen: %d\r\n", gLoraBuffer, gLoraRecvLen);
 			ptr = strtok(gLoraBuffer, " ");
 			ptr = strtok(NULL, " ");
 			ptr = strtok(NULL, " ");
 			if(memcmp(ptr, "error\r\n", strlen(ptr)) != 0 || memcmp(ptr, NULL, strlen(ptr)) != 0)
 			{
-				PRINTF("RX Test COMPLETE\r\n");
+				PRINTF("(TARGET2)RX Test COMPLETE\r\n");
 				ret = 0;
 			}
 			else
 			{
-				PRINTF("RX Test FAIL\r\n");
-				PRINTF("RX Buffer:%s\r\n", ptr);
+				PRINTF("(TARGET2)RX Test FAIL\r\n");
+				PRINTF("(TARGET2)RX Buffer:%s\r\n", ptr);
 				ret = -1;
 			}
 			UART_InterruptEnable(UART3, UART_INT_MASK_RX);
 			
 			gLoraRecvLen = 0;
 			memset(gLoraBuffer, 0, 64);
+			memset(result, 0, strlen(result));
 		}
 	}
 	return ret;
 }
-int lora_test_comm(int type)
+int LoraTestStart(int type)
 {
 	int ret = -1;
 	int fail_num = 0;
@@ -484,7 +572,7 @@ int lora_test_comm(int type)
 	
 	for(int j = 0; j< Lora_command_MAX; j++ )
 	{
-		ret = lora_comm_send(j, &readed);
+		ret = LoraCommRead(j, &readed);
 		if(ret != 0)
 		{
 			PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
@@ -496,13 +584,13 @@ int lora_test_comm(int type)
 		
 		if(type == 0)
 		{
-			ret = ltCommSend(readed, readLen);
+			ret = LoraCommSend(readed, readLen, TARGET_1);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 		}
 		else
 		{
-			ret = ltCommSend_t(readed, readLen);
+			ret = LoraCommSend(readed, readLen, TARGET_2);
 			if(ret != 0)
 				PRINTF("%s:%d:%d\r\n",__func__,__LINE__,ret);
 		}
@@ -510,11 +598,9 @@ int lora_test_comm(int type)
             __NOP();
 			
 		DELAY_SleepMS(100);
-		ret = lora_test_cmp(j, type);
+		ret = LoraTestCmp(j, type);
 		if(ret == 1)
 			fail_num++;
-//			goto lora_test_comm;
 	}
-//lora_test_comm:	
 	return fail_num;
 }

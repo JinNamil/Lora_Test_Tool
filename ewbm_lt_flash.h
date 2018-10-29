@@ -3,6 +3,7 @@
 #include "MS500.h"
 #define LT_FLASH_BASE_ADDR         (0x30000000)
 #define LT_FLASH_SAVE_ADDR         (0x30220000)
+#define LT_FLASH_BOOT_ADDR		   LT_FLASH_SAVE_ADDR+(0x00008192)
 
 int ltFlashErase64KB(unsigned int addr);
 int ltFlashWriteAddr(unsigned int addr, char* in, unsigned int inLen);

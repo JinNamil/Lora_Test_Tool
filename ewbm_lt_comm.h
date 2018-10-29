@@ -100,23 +100,23 @@ static const char* LoraTxRxName[128] = {
 };
 
 static const char* LoraCommandList[128] = {
-    "1\r\n",
-    "1\r\n",
-    "A\r\n",
-	"0\r\n",
-    "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r\n",
-    "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r\n",
-	"00:00:00:00\r\n",
-    "6\r\n",
-	"0\r\n",
-	"0\r\n",
-	"\r\n",
-	"0\r\n",
+    "1",
+    "1",
+    "A",
+	"0",
+    "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+    "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+	"00:00:00:00",
+    "6",
+	"0",
+	"0",
+	"",
+	"",
 	"1.2.1",
-	"0.000000\r\n",
-	"0\r\n",
-	"0\r\n",
-	"00:01:01:01:01:01:01:01\r\n"
+	"0.000000",
+	"0",
+	"0",
+	"00:01:01:01:01:01:01:01"
 };
 
 
@@ -146,18 +146,18 @@ static const char* LoraTxRxTestCommand[128] = {
 };
 
 static const char* LoraTxRxValue[128] = {
-	"922500000 14 7 10 1\r\n",	//21
-	"922500000 7\r\n"	//13
+	"922500000 14 7 10 1",	//21
+	"922500000 7"	//13
 };
 
 static int LoraCommSend(unsigned char* in, unsigned int inLen, int target);
-int LoraTestCmp(int j, int type);
+int LoraTestCmp(int j, int target);
 int LoraTestInit(void);
 int LoraCommCompare(char* command, int list_num, char* value);
 int LoraBootStatus(void);
 int LoraCommRead(int num, uint8_t** read);
-int LoraTestStart(int type);
-int LoraCommandEdit(int RecvLen, char* RecvBuffer);
+int LoraTestStart(int target);
+int LoraCommandEdit(char* RecvBuffer);
 int LoraTxRxTest(int tar, int change);
 int LoraFlashInit(void);
 int LoraCommandMade(int num, char* value);

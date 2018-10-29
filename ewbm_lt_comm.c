@@ -5,36 +5,35 @@
 #include "MS500.h"
 #include "hal_uart.h"
 #include "hal_gpio.h"
+#include "hal_flash.h"
 #include "ewbm_lt_comm.h"
 #include "ewbm_lt_flash.h"
 
-unsigned char* LoraCommandValue;
 uint8_t* readed = {0,};
 unsigned int readLen = 0;
 int gLoraRecvLen = 0;
 unsigned char gLoraBuffer[64] = { 0, };
-unsigned char CommReceiveBuffer[Lora_command_MAX] = {0, };
 
 commandlist DefaultLoraCommandvalue = {
-										.PNM = "1\r\n",                                                  
-										.NJM = "1\r\n",             
-										.CLASS = "A\r\n",           
-										.AJOIN = "0\r\n",           
-										.NWKSKEY = "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r\n",         
-										.APPSKEY = "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00\r\n",         
-										.DADDR = "00:00:00:00\r\n",           
-										.REGION = "6\r\n",          
-										.ADR = "0\r\n",             
-										.DR = "0\r\n",              
-										.MCHTXP = "\r\n",           
-										.CRYPTO = "0\r\n",          
+										.PNM = "1",                                                  
+										.NJM = "1",             
+										.CLASS = "A",           
+										.AJOIN = "0",           
+										.NWKSKEY = "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",         
+										.APPSKEY = "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",         
+										.DADDR = "00:00:00:00",           
+										.REGION = "6",          
+										.ADR = "0",             
+										.DR = "0",              
+										.MCHTXP = "",           
+										.CRYPTO = "0",          
 										.VER = "1.2.1",             
-										.SAG = "0.000000\r\n",             
-										.CFM = "0\r\n",             
-										.ECHO = "0\r\n",            
-										.DEVEUI = "00:01:01:01:01:01:01:01\r\n",          
-										.TXST = "922500000 14 7 10 1\r\n",
-										.RXST = "922500000 7\r\n"
+										.SAG = "0.000000",             
+										.CFM = "0",             
+										.ECHO = "0",            
+										.DEVEUI = "01:01:01:01:01:01:01:01",          
+										.TXST = "922500000 14 7 10 1",
+										.RXST = "922500000 7"
 									  };
 
 
@@ -178,7 +177,8 @@ int LoraBootStatus(void)
 {
 	int status_1;
 	int status_2;
-
+	int ret = 0;
+	
 	GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
 	GPIO_WritePin(GPIO1, GPIO_PIN_1, 0);
 	DELAY_SleepMS(1);
@@ -201,7 +201,15 @@ int LoraBootStatus(void)
 		status_2 = 0;
 		return 0;
 	}
-	return -1;
+	else
+	{
+		if(status_1 == 0 && status_2 == 1)
+			ret = 1;
+		else if(status_1 == 1 && status_2 == 0)
+			ret = 2;
+			
+		return ret;
+	}
 }
 
 int LoraInFlash(int offset, unsigned char* in)
@@ -232,10 +240,10 @@ int LoraInFlash(int offset, unsigned char* in)
 	if(ret != 0)
 		PRINTF("ERROR!\r\n");
 	
-	memset(value, 0, strlen(value));
+	memset(value, 0, 128);
 	return ret;
 }
-int LoraCommandEdit(int RecvLen, char* RecvBuffer)
+int LoraCommandEdit(char* RecvBuffer)
 {
 	char* result = {0,};
 	int ret = -1;
@@ -268,12 +276,13 @@ LoraCommandEdit:
 		ret = LoraInFlash(TXST, txrxResult);
 		if(ret != 0)
 			PRINTF("ERROR %s,#%d\r\n",__func__,__LINE__);
-			
+		
+		PRINTF("CHANGE VALUE: %s\r\n", txrxResult);
 		offset += strlen(LoraTxRxValue[0]);
 		
 		PRINTF("TXST Default Edit Change Complete\r\n");
 		
-		free(LoraCommandValue);
+		memset(txrxResult, 0, sizeof(txrxResult));
 		return EditDefault;
 	}
 	else if(memcmp(LoraTxRxName[1], RecvBuffer, strlen(LoraTxRxName[1])) == 0)
@@ -286,11 +295,12 @@ LoraCommandEdit:
 		if(ret != 0)
 			PRINTF("ERROR %s,#%d\r\n",__func__,__LINE__);
 		
+		PRINTF("CHANGE VALUE: %s\r\n", txrxResult);
 		offset += strlen(LoraTxRxValue[1]);
 		
 		PRINTF("RXST Default Edit Change Complete\r\n");
 		
-		free(LoraCommandValue);
+		memset(txrxResult, 0, sizeof(txrxResult));
 		return EditDefault;
 	}
 	
@@ -311,21 +321,38 @@ LoraCommandEdit:
 		PRINTF("-----------------RESET COMMAND-----------------\r\n");
 		return EditDefault;
 	}
+	else if(memcmp(RecvBuffer, "DELETE", 6) == 0)
+	{
+		FLASH_SectorErase((LT_FLASH_SAVE_ADDR-LT_FLASH_BASE_ADDR)>>12);
+		FLASH_SectorErase((LT_FLASH_BOOT_ADDR-LT_FLASH_BASE_ADDR)>>12);
+		PRINTF("-----------------FLASH DELETE-----------------\r\n");
+		return EditDefault;
+	}
 	if(CommNum == -1)
 	{
 		PRINTF("NOT Command\r\n");
 		return EditDefault;
 	}
 	
-	
 	PRINTF("Command Name: %s\r\n", result);
+	
+	if(result[strlen(result)+1] == NULL)
+	{
+		memset(result, 0, strlen(result));
+		PRINTF("Value is NULL\r\n");
+		return EditDefault;
+	}
+	
 	result = strtok(NULL, " ");
+	
 	PRINTF("Command Value: %s\r\n", result);
 	ret = LoraInFlash(CommNum, result);
 	if(ret != 0)
 		PRINTF("ERROR %s,#%d\r\n",__func__,__LINE__);
 		
+	memset(result, 0, strlen(result));
 	PRINTF("Default Edit Complete\r\n");
+	
 	return EditDefault;
 }
 
@@ -353,6 +380,10 @@ int LoraFlashInit(void)
 	if(ret != 0)
 		PRINTF("ERROR!\r\n");
 	
+	ret = ltFlashWriteAddr(LT_FLASH_BOOT_ADDR, "1", 1);
+	if(ret != 0)
+		PRINTF("ERROR!\r\n");
+		
 	return ret;
 }
 
@@ -361,97 +392,97 @@ int LoraCommandChange(int num, char* value)
 	switch(num)
 	{
 		case PNM:
-			memset(LoraCommandvalue.PNM, 0, strlen(LoraCommandvalue.PNM));
+			memset(LoraCommandvalue.PNM, 0, 128);
 			memcpy(LoraCommandvalue.PNM, value, strlen(DefaultLoraCommandvalue.PNM));
 			break;
 
 		case NJM:
-			memset(LoraCommandvalue.NJM, 0, strlen(LoraCommandvalue.NJM));
+			memset(LoraCommandvalue.NJM, 0, 128);
 			memcpy(LoraCommandvalue.NJM, value, strlen(DefaultLoraCommandvalue.NJM));
 			break;
 
 		case CLASS:
-			memset(LoraCommandvalue.CLASS, 0, strlen(LoraCommandvalue.CLASS));
+			memset(LoraCommandvalue.CLASS, 0, 128);
 			memcpy(LoraCommandvalue.CLASS, value, strlen(DefaultLoraCommandvalue.CLASS));
 			break;
 
 		case AJOIN:
-			memset(LoraCommandvalue.AJOIN, 0, strlen(LoraCommandvalue.AJOIN));
+			memset(LoraCommandvalue.AJOIN, 0, 128);
 			memcpy(LoraCommandvalue.AJOIN, value, strlen(DefaultLoraCommandvalue.AJOIN));
 			break;
 
 		case NWKSKEY:
-			memset(LoraCommandvalue.NWKSKEY, 0, strlen(LoraCommandvalue.NWKSKEY));
+			memset(LoraCommandvalue.NWKSKEY, 0, 128);
 			memcpy(LoraCommandvalue.NWKSKEY, value, strlen(DefaultLoraCommandvalue.NWKSKEY));
 			break;
 
 		case APPSKEY:
-			memset(LoraCommandvalue.APPSKEY, 0, strlen(LoraCommandvalue.APPSKEY));
+			memset(LoraCommandvalue.APPSKEY, 0, 128);
 			memcpy(LoraCommandvalue.APPSKEY, value, strlen(DefaultLoraCommandvalue.APPSKEY));
 			break;
 
 		case DADDR:
-			memset(LoraCommandvalue.DADDR, 0, strlen(LoraCommandvalue.DADDR));
+			memset(LoraCommandvalue.DADDR, 0, 128);
 			memcpy(LoraCommandvalue.DADDR, value, strlen(DefaultLoraCommandvalue.DADDR));
 			break;
 
 		case REGION:
-			memset(LoraCommandvalue.REGION, 0, strlen(LoraCommandvalue.REGION));
+			memset(LoraCommandvalue.REGION, 0, 128);
 			memcpy(LoraCommandvalue.REGION, value, strlen(DefaultLoraCommandvalue.REGION));
 			break;
 
 		case ADR:
-			memset(LoraCommandvalue.ADR, 0, strlen(LoraCommandvalue.ADR));
+			memset(LoraCommandvalue.ADR, 0, 128);
 			memcpy(LoraCommandvalue.ADR, value, strlen(DefaultLoraCommandvalue.ADR));
 			break;
 
 		case DR:
-			memset(LoraCommandvalue.DR, 0, strlen(LoraCommandvalue.DR));
+			memset(LoraCommandvalue.DR, 0, 128);
 			memcpy(LoraCommandvalue.DR, value, strlen(DefaultLoraCommandvalue.DR));
 			break;
 
 		case MCHTXP:
-			memset(LoraCommandvalue.MCHTXP, 0, strlen(LoraCommandvalue.MCHTXP));
+			memset(LoraCommandvalue.MCHTXP, 0, 128);
 			memcpy(LoraCommandvalue.MCHTXP, value, strlen(DefaultLoraCommandvalue.MCHTXP));
 			break;
 
 		case CRYPTO:
-			memset(LoraCommandvalue.CRYPTO, 0, strlen(LoraCommandvalue.CRYPTO));
+			memset(LoraCommandvalue.CRYPTO, 0, 128);
 			memcpy(LoraCommandvalue.CRYPTO, value, strlen(DefaultLoraCommandvalue.CRYPTO));
 			break;
 
 		case VER:
-			memset(LoraCommandvalue.VER, 0, strlen(LoraCommandvalue.VER));
+			memset(LoraCommandvalue.VER, 0, 128);
 			memcpy(LoraCommandvalue.VER, value, strlen(DefaultLoraCommandvalue.VER));
 			break;
 
 		case SAG:
-			memset(LoraCommandvalue.SAG, 0, strlen(LoraCommandvalue.SAG));
+			memset(LoraCommandvalue.SAG, 0, 128);
 			memcpy(LoraCommandvalue.SAG, value, strlen(DefaultLoraCommandvalue.SAG));
 			break;
 
 		case CFM:
-			memset(LoraCommandvalue.CFM, 0, strlen(LoraCommandvalue.CFM));
+			memset(LoraCommandvalue.CFM, 0, 128);
 			memcpy(LoraCommandvalue.CFM, value, strlen(DefaultLoraCommandvalue.CFM));
 			break;
 
 		case ECHO:
-			memset(LoraCommandvalue.ECHO, 0, strlen(LoraCommandvalue.ECHO));
+			memset(LoraCommandvalue.ECHO, 0, 128);
 			memcpy(LoraCommandvalue.ECHO, value, strlen(DefaultLoraCommandvalue.ECHO));
 			break;
 
 		case DEVEUI:
-			memset(LoraCommandvalue.DEVEUI, 0, strlen(LoraCommandvalue.DEVEUI));
+			memset(LoraCommandvalue.DEVEUI, 0, 128);
 			memcpy(LoraCommandvalue.DEVEUI, value, strlen(DefaultLoraCommandvalue.DEVEUI));
 			break;
 		
 		case TXST:
-			memset(LoraCommandvalue.TXST, 0, strlen(LoraCommandvalue.TXST));
+			memset(LoraCommandvalue.TXST, 0, 128);
 			memcpy(LoraCommandvalue.TXST, value, strlen(DefaultLoraCommandvalue.TXST));
 			break;
 		
 		case RXST:
-			memset(LoraCommandvalue.RXST, 0, strlen(LoraCommandvalue.RXST));
+			memset(LoraCommandvalue.RXST, 0, 128);
 			memcpy(LoraCommandvalue.RXST, value, strlen(DefaultLoraCommandvalue.RXST));
 			break;
 			
@@ -467,6 +498,20 @@ int LoraTestInit(void)
 	int ret = -1;
 	ret = ltFlashInit();
 	char value[128] = {0,};
+	char boot[128] = {0,};
+	GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
+	GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+	
+	memcpy(boot, (unsigned char*)LT_FLASH_BOOT_ADDR, 1);
+	
+	if(memcmp(boot, "1", 1) == 0)
+		PRINTF("Already Default Data in Flash\r\n");
+	else
+	{
+		LoraFlashInit();
+		PRINTF("Default Data in Flash\r\n");
+	}
+		
 	memcpy(&LoraCommandvalue, (unsigned char*)LT_FLASH_SAVE_ADDR, sizeof(commandlist));
 	
 	PRINTF("------------------Lora Init--------------------\r\n");
@@ -477,7 +522,7 @@ int LoraTestInit(void)
 		if(i == 12)
 			PRINTF("%s: %s\r\n", LoraCommandName[i], value);
 		else
-			PRINTF("%s: %s", LoraCommandName[i], value);
+			PRINTF("%s: %s\r\n", LoraCommandName[i], value);
 			
 		memset(value, 0, strlen(value));
 	}
@@ -494,7 +539,7 @@ int LoraTestInit(void)
 				memcpy(value, LoraCommandvalue.RXST, strlen(LoraCommandvalue.RXST));
 				break;
 		}
-		PRINTF("%s: %s", LoraTxRxName[j], value);
+		PRINTF("%s: %s\r\n", LoraTxRxName[j], value);
 		
 		memset(value, 0, strlen(value));
 	}
@@ -507,13 +552,16 @@ int LoraTestInit(void)
 	return 0;
 }
 
-int LoraTestCmp(int j, int type)
+int prob = 0;
+int LoraTestCmp(int j, int target)
 {
+	int timeout = 0;
 	int ret = -1;
 	int fail_count = 0;
 	unsigned char ltCommReceiveTemp[64] = {0,};
 	unsigned char ptr[64] = {0, };
 	char value[128] = {0,};
+	char* Aptr = (char*)malloc(strlen(gLoraBuffer));
 	
 	memcpy(&LoraCommandvalue, (unsigned char*)LT_FLASH_SAVE_ADDR, sizeof(commandlist));
 	
@@ -532,13 +580,34 @@ int LoraTestCmp(int j, int type)
 			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
 			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 			
-			while(1)
+			if(target == TARGET_1)
+				prob = 1;
+			else
 			{
-				GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-				DELAY_SleepMS(200);
+				if(prob != 0)
+				{
+					prob = 0;
+					while( 1 )
+					{
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+				else
+				{
+					while( 1 )
+					{
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
 			}
 		}
-		PRINTF("%s <OK>\r\n",LoraCommandName[j]);
+		if(j != DEVEUI)
+			PRINTF("%s <OK>\r\n",LoraCommandName[j]);
 	}
 	else
 	{
@@ -551,10 +620,30 @@ int LoraTestCmp(int j, int type)
 			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
 			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 			
-			while(1)
+			if(target == TARGET_1)
+				prob = 1;
+			else
 			{
-				GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-				DELAY_SleepMS(200);
+				if(prob != 0)
+				{
+					prob = 0;
+					while(1)
+					{
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+				else
+				{
+					while(1)
+					{
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
 			}
 		}
 		else if(j == DEVEUI)
@@ -567,14 +656,19 @@ int LoraTestCmp(int j, int type)
 		memcpy(ltCommReceiveTemp, gLoraBuffer, strlen(value));
 		PRINTF("\r\n[Current Value]:%s\r\n%s Value Change: %s\r\n", ltCommReceiveTemp, LoraCommandName[j], value);
 		
+		memset(gLoraBuffer, 0, sizeof(gLoraBuffer));
+
 		fail_count++;
+		
+		if(j == VER)
+			fail_count = 0;
 	}
 	if(fail_count != 0)
 	{
 		PRINTF("%s is change\r\n", LoraCommandName[j]);
 		sprintf(ptr, "%s %s", LoraCommand[j], value);
 		
-		if(type == 0)
+		if(target == TARGET_1)
 		{
 			ret = LoraCommSend(ptr, strlen(ptr), TARGET_1);
 		}
@@ -584,13 +678,40 @@ int LoraTestCmp(int j, int type)
 		}
 		
 		while ( gLoraRecvLen < 5 )
+		{
+			DELAY_SleepMS(1);
+			timeout++;
+			if(timeout > 5000)
+			{
+				PRINTF("TIME OUT\r\n");
+				timeout = 0;
+				return -1;
+			}
 			__NOP();
-			
+		}
+		
+		DELAY_SleepMS(100);
+		int i = 0;
+		while(gLoraBuffer[i] != 'K' || gLoraBuffer[i-1] != 'O')
+		{
+			i++;
+			DELAY_SleepMS(1);
+			timeout++;
+			if(timeout > 1000)
+			{
+				PRINTF("CHANGE ERROR\r\n");
+				timeout = 0;
+				return -1;
+			}
+			__NOP();
+		}
+		PRINTF("EDIT %c%c\r\n", gLoraBuffer[i-1], gLoraBuffer[i]);
+		
 		DELAY_SleepMS(100);
 	}
 	
 LoraTestCmp:
-	memset(gLoraBuffer, 0, strlen(gLoraBuffer));
+	memset(gLoraBuffer, 0, sizeof(gLoraBuffer));
 	memset(ltCommReceiveTemp, 0, strlen(ltCommReceiveTemp));
 	memset(value, 0, strlen(value));
 	return fail_count;
@@ -621,7 +742,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -638,7 +759,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -684,7 +805,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -702,7 +823,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -750,7 +871,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -767,7 +888,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -815,7 +936,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -833,7 +954,7 @@ int LoraTxRxTest(int tar, int change)
 				timeout++;
 				if(timeout > 5000)
 				{
-					PRINTF("time out!!\r\n");
+					PRINTF("TIME OUT\r\n");
 					timeout = 0;
 					return -1;
 				}
@@ -865,8 +986,9 @@ int LoraTxRxTest(int tar, int change)
 	}
 	return ret;
 }
-int LoraTestStart(int type)
+int LoraTestStart(int target)
 {
+	int timeout = 0;
 	int ret = -1;
 	int fail_num = 0;
 	uint8_t* ptr = {0,};
@@ -883,7 +1005,7 @@ int LoraTestStart(int type)
 		
 		gLoraRecvLen = 0;		
 		
-		if(type == 0)
+		if(target == 0)
 		{
 			ret = LoraCommSend(readed, readLen, TARGET_1);
 			if(ret != 0)
@@ -897,12 +1019,24 @@ int LoraTestStart(int type)
 		}
 		
         while ( gLoraRecvLen < strlen(LoraCommandList[j]) )
-            __NOP();
+		{
+			DELAY_SleepMS(1);
+			timeout++;
+			if(timeout > 5000)
+			{
+				PRINTF("TIME OUT\r\n");
+				timeout = 0;
+				return -1;
+			}
+			__NOP();
+		}
 			
 		DELAY_SleepMS(100);
-		ret = LoraTestCmp(j, type);
+		ret = LoraTestCmp(j, target);
 		if(ret == 1)
 			fail_num++;
+		else if(ret == -1)
+			fail_num = -1;
 	}
 	return fail_num;
 }

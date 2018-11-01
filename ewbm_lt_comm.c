@@ -173,6 +173,107 @@ int LoraCommCompare(char* command, int list_num, char* value)
 	return ret;
 }
 
+int LoraLedSetting(int target, int test)
+{
+	if(test == RF_TEST)
+	{
+		while(1)
+		{
+			GPIO_TogglePin(GPIO2, GPIO_PIN_13);
+			GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+			GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+			DELAY_SleepMS(200);
+		}
+	}
+	else
+	{
+		switch(target)
+		{
+			case TARGET_1:
+			{
+				if(test == CMP_TEST)
+				{
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+				else if(test == BOOT_TEST)
+				{					
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_11);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+			}
+			case TARGET_2:
+			{
+				if(test == CMP_TEST)
+				{
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+				else if(test == BOOT_TEST)
+				{					
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_11);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+			}
+			case TARGET_1_2:
+			{
+				if(test == CMP_TEST)
+				{
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+				else if(test == BOOT_TEST)
+				{
+					GPIO_WritePin(GPIO2, GPIO_PIN_11, 1);
+				}
+				else if(test == RESET)
+				{
+					GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
+					GPIO_WritePin(GPIO1, GPIO_PIN_1, 0);
+					DELAY_SleepMS(1);
+					GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
+					
+					GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+					GPIO_WritePin(GPIO1, GPIO_PIN_2, 0);
+					DELAY_SleepMS(1);
+					GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+					
+					DELAY_SleepMS(1000);
+				}
+				else if(test == RF_TEST_SUCCESS)
+				{
+					GPIO_WritePin(GPIO2, GPIO_PIN_13, 1);
+				}
+				else if(test == CMP_TEST_SUCCESS)
+				{
+					GPIO_WritePin(GPIO2, GPIO_PIN_12, 1);
+				}
+			}
+		}
+	}
+}
+
 int LoraBootStatus(void)
 {
 	int status_1;
@@ -336,7 +437,7 @@ LoraCommandEdit:
 	
 	PRINTF("Command Name: %s\r\n", result);
 	
-	if(result[strlen(result)+1] == NULL)
+	if(result[strlen(result)+1] == 0)
 	{
 		memset(result, 0, strlen(result));
 		PRINTF("Value is NULL\r\n");
@@ -986,6 +1087,7 @@ int LoraTxRxTest(int tar, int change)
 	}
 	return ret;
 }
+
 int LoraTestStart(int target)
 {
 	int timeout = 0;
@@ -1005,7 +1107,7 @@ int LoraTestStart(int target)
 		
 		gLoraRecvLen = 0;		
 		
-		if(target == 0)
+		if(target == TARGET_1)
 		{
 			ret = LoraCommSend(readed, readLen, TARGET_1);
 			if(ret != 0)

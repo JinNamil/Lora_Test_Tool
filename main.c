@@ -8,7 +8,7 @@
 
 
 
-int temp = 0;
+int temp = TEST_WAIT;
 int type = 1;
 int target = TARGET_3;
 int gRecvLen = 0;
@@ -37,13 +37,12 @@ static void gpioInterrupt(void* param)
 	GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
 	GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
 	GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
-	temp = 1;
+	temp = TEST_START;
 }
 
 int main(void)
 {
 	int ret = -1;
-	int edit;
 	int target_cmp_error = 0;
 	
     PINMAP_Pin pins[] = {PA8, PA9, PB4, PB5, PB6, PB7, PIN_NON};
@@ -84,71 +83,59 @@ int main(void)
 	
 	while ( 1 )
     {
-		if(temp == 1)
+		if(temp == TEST_START)
 		{	
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("                  Test START\r\n");
+			PRINTF("                  TEST START\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
 			target = TARGET_1;
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("                 Boot Test Start\r\n");
+			PRINTF("                 BOOT TEST Start\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
 			ret = LoraBootStatus();
-			if(ret != 0)
+			if(ret != BOOT_PASS)
 			{
-				if(ret == 1)
+				if(ret == BOOT_TARGET1_ERROR)
 				{
-					PRINTF("Target1 Boot Fail\r\n");
+					PRINTF("TARGET1 BOOT FAIL\r\n");
 					
-					while(1)
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_11);
-						DELAY_SleepMS(200);
-					}
+					LoraLedSetting(TARGET_1, BOOT_TEST);
 				}
-				else if(ret == 2)
+				else if(ret == BOOT_TARGET2_ERROR)
 				{
-					PRINTF("Target2 Boot Fail\r\n");
+					PRINTF("TARGET2 BOOT FAIL\r\n");
 					
-					while(1)
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_11);
-						DELAY_SleepMS(200);
-					}
+					LoraLedSetting(TARGET_2, BOOT_TEST);
 				}
 			}
-			else if(ret == 0)
-				GPIO_WritePin(GPIO2, GPIO_PIN_11, 1);
+			else if(ret == BOOT_PASS)
+				LoraLedSetting(TARGET_1_2, BOOT_TEST);
 				
-			temp = 0;	
+			temp = TEST_WAIT;	
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("               Command Test START\r\n");
+			PRINTF("               COMMAND TEST START\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
 			PRINTF("[TARGET 1] START\r\n");
 			ret = LoraTestStart(target);
-			if(ret == -1)
+			if(ret == TARGET_DEVEUI_ERROR)
 			{
-				target_cmp_error = 1;
+				target_cmp_error = TARGET1_DEVEUI_ERROR;
 				PRINTF("[TARGET 1] FAIL\r\n");
 			}
-			else if(ret == -2)
+			else if(ret == TARGET_VER_ERROR)
 			{
-				target_cmp_error = 2;
+				target_cmp_error = TARGET1_VER_ERROR;
 				PRINTF("[TARGET 1] FAIL\r\n");
 			}
 			
-			edit = ret;
-			
-			if(edit == 0 && target_cmp_error != 1 && target_cmp_error != 2)
+			if(ret == TARGET_SUCCESS && target_cmp_error != TARGET1_DEVEUI_ERROR && target_cmp_error != TARGET1_VER_ERROR)
 			{	
-				PRINTF("[TARGET 1] Complete\r\n");
+				PRINTF("[TARGET 1] COMPLETE\r\n");
 			}
-			else if(target_cmp_error != 1 && target_cmp_error != 2)
+			else if(target_cmp_error != TARGET1_DEVEUI_ERROR && target_cmp_error != TARGET1_VER_ERROR)
 			{
-				PRINTF("\r\n\r\n%d command edit!!\r\n",edit);
-				PRINTF("[TARGET 1] Edit Complete\r\n\r\n");
+				PRINTF("\r\n\r\n%d COMMAND EDIT\r\n", ret);
+				PRINTF("[TARGET 1] EDIT COMPLETE\r\n\r\n");
 			}
 			
 			target = TARGET_2;
@@ -163,221 +150,135 @@ int main(void)
 			//target_cmp_error = 2 : target 1 VER error
 			//ret = -1 : target 2 DEVEUI error
 			//ret = -2 : target 2 VER error
-			if(target_cmp_error == 1 || target_cmp_error == 2 || ret == -1 || ret == -2) //edit
+			if(target_cmp_error == TARGET1_DEVEUI_ERROR || target_cmp_error == TARGET1_VER_ERROR || ret == TARGET2_DEVEUI_ERROR || ret == TARGET2_VER_ERROR) //edit
 			{
 				GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 				
 				//target1 VER + target2 VER
-				if((target_cmp_error == 2 && ret == -2))
+				if((target_cmp_error == TARGET1_VER_ERROR && ret == TARGET2_VER_ERROR))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1_2, CMP_TEST);
 				}
 				//target1 VER + target2 DEVEUI
-				if((target_cmp_error == 2 && ret == -1))
+				if((target_cmp_error == TARGET1_VER_ERROR && ret == TARGET2_DEVEUI_ERROR))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1_2, CMP_TEST);
 				}
 				//target1 VER + target2 pass
-				if((target_cmp_error == 2 && ret == 0))
+				if((target_cmp_error == TARGET1_VER_ERROR && ret == TARGET_SUCCESS))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] COMPLETE\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1, CMP_TEST);
 				}
 				//target1 DEVEUI + target2 DEVEUI
-				if((target_cmp_error == 1 && ret == -1))
+				if((target_cmp_error == TARGET1_DEVEUI_ERROR && ret == TARGET2_DEVEUI_ERROR))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1_2, CMP_TEST);
 				}
 				//target1 DEVEUI + target2 VER
-				if((target_cmp_error == 1 && ret == -2))
+				if((target_cmp_error == TARGET1_DEVEUI_ERROR && ret == TARGET2_VER_ERROR))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1_2, CMP_TEST);
 				}
 				//target1 DEVEUI + target2 pass
-				if((target_cmp_error == 1 && ret == 0))
+				if((target_cmp_error == TARGET1_DEVEUI_ERROR && ret == TARGET_SUCCESS))
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] COMPLETE\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_1, CMP_TEST);
 				}
 				//target1 pass + target2 DEVEUI
-				else if(target_cmp_error == 0 && ret == -1)
+				else if(target_cmp_error == TARGET_SUCCESS && ret == TARGET2_DEVEUI_ERROR)
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_2, CMP_TEST);
 				}
 				//target1 pass + target2 VER
-				else if(target_cmp_error == 0 && ret == -2)
+				else if(target_cmp_error == TARGET_SUCCESS && ret == TARGET2_VER_ERROR)
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
-					while(1)
-					{
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						DELAY_SleepMS(200);
-					}
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
+					LoraLedSetting(TARGET_2, CMP_TEST);
 				}
 				//target1 pass + target2 pass
-				else if(target_cmp_error == 0 && ret != -1 && ret != -2)
+				else if(target_cmp_error == TARGET_SUCCESS && ret != TARGET2_DEVEUI_ERROR && ret != TARGET2_VER_ERROR)
 				{
-					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] COMPLETE\r\n");
+					PRINTF("\r\nERROR CODE: %d%d\r\n", target_cmp_error, ret);
 				}
 				target_cmp_error = 0;
 			}
 			
-			edit = ret;
-			if(ret != -1 && ret != -2)
+			if(ret != TARGET2_DEVEUI_ERROR && ret != TARGET2_VER_ERROR)
 			{
-				if(edit == 0)
+				if(ret == TARGET_SUCCESS)
 				{				
-					PRINTF("[TARGET 2] Complete\r\n\r\n");
+					PRINTF("[TARGET 2] COMPLETE\r\n\r\n");
 				}
 				else
 				{
-					PRINTF("\r\n\r\n%d command edit!!\r\n",edit);
-					PRINTF("[TARGET 2] Edit Complete\r\n");
+					PRINTF("[TARGET 2] EDIT COMPLETE\r\n");
+					PRINTF("\r\n\r\n%d COMMAND EDIT\r\n",ret);
 				}
 			}
-			
-			GPIO_WritePin(GPIO2, GPIO_PIN_12, 1);
+			LoraLedSetting(TARGET_1_2, CMP_TEST_SUCCESS);
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("               Command Test COMPLETE\r\n");
+			PRINTF("               COMMAND TEST COMPLETE\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
 			
 			
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("                 RF Test START\r\n");
+			PRINTF("                 RF TEST START\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
 			ret = LoraTxRxTest(TARGET_1, TxRxTest_1);
-			if(ret != 0)
+			if(ret != TARGET_SUCCESS)
 			{
-				while(1)
-				{
-					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-					DELAY_SleepMS(200);
-				}
+				LoraLedSetting(TARGET_1, RF_TEST);
 			}
 			DELAY_SleepMS(500);
 			
 			ret = LoraTxRxTest(TARGET_2, TxRxTest_1);
-			if(ret != 0)
+			if(ret != TARGET_SUCCESS)
 			{
-				while(1)
-				{
-					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-					DELAY_SleepMS(200);
-				}
+				LoraLedSetting(TARGET_2, RF_TEST);
 			}
 			
 			/* lora all reset */
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 0);
-			DELAY_SleepMS(1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
-			
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 0);
-			DELAY_SleepMS(1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
-			
-			DELAY_SleepMS(1000);
+			LoraLedSetting(TARGET_1_2, RESET);
 			
 			//txrx test change
 			ret = LoraTxRxTest(TARGET_1, TxRxTest_2);
-			if(ret != 0)
+			if(ret != TARGET_SUCCESS)
 			{
 				while(1)
 				{
-					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-					DELAY_SleepMS(200);
+					LoraLedSetting(TARGET_1, RF_TEST);
 				}
 			}
 			DELAY_SleepMS(500);
 			
 			ret = LoraTxRxTest(TARGET_2, TxRxTest_2);
-			if(ret != 0)
+			if(ret != TARGET_SUCCESS)
 			{
-				while(1)
-				{
-					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
-					DELAY_SleepMS(200);
-				}
+				LoraLedSetting(TARGET_2, RF_TEST);
 			}
 			PRINTF("-----------------------------------------------\r\n");
-			PRINTF("                 RF Test COMPLETE\r\n");
+			PRINTF("                 RF TEST COMPLETE\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
-			GPIO_WritePin(GPIO2, GPIO_PIN_13, 1);
-			
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 0);
-			DELAY_SleepMS(1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
-			
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 0);
-			DELAY_SleepMS(1);
-			GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
+			LoraLedSetting(TARGET_1_2, RF_TEST_SUCCESS);
+			LoraLedSetting(TARGET_1_2, RESET);
 			
 			PRINTF("-----------------------------------------------\r\n");
 			PRINTF("                   TEST FINISH\r\n");
@@ -387,7 +288,7 @@ int main(void)
 			type = 1;
 			
 		}
-		else if(temp == 0)
+		else if(temp == TEST_WAIT)
 		{
 			target = TARGET_3;
 			PRINTF("\r\n-----------------------\r\n");
@@ -396,7 +297,7 @@ int main(void)
 
 			while( gBuffer[gRecvLen] != 0x0A && gBuffer[gRecvLen-1] != 0x0D )
 			{
-				if(temp == 1)
+				if(temp == TEST_START)
 				{
 					goto main;
 				}
@@ -410,7 +311,7 @@ main:
 			memset(gBuffer, 0, sizeof(gBuffer));
 			
 			if(ret == EditStart)
-				temp = 1;
+				temp = TEST_START;
 		}
 		if(ret == EditType)
 			PRINTF("TYPE CHANGE\r\n");

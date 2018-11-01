@@ -32,6 +32,20 @@ typedef enum LoraTxRxNameNum{
 	RXST = 51
 }LoraTxRxNameNum;
 
+typedef enum LoraCommandCmp{
+	TARGET_SUCCESS = 0,
+	TARGET1_DEVEUI_ERROR = 1,
+	TARGET1_VER_ERROR = 2,
+	TARGET2_DEVEUI_ERROR = -1,
+	TARGET2_VER_ERROR = -2,
+	TARGET_DEVEUI_ERROR = -1,
+	TARGET_VER_ERROR = -2
+}LoraCommandCmp;
+
+typedef enum LoraTemp{
+	TEST_WAIT = 0,
+	TEST_START
+}LoraTemp;
 typedef enum LoraCommandNameNum {
     PNM=0,
 	NJM,
@@ -67,8 +81,24 @@ typedef enum Edit_t{
 typedef enum Target_t{
 	TARGET_1 = 0,
 	TARGET_2,
-	TARGET_3
+	TARGET_3,
+	TARGET_1_2
 }Target_t;
+
+typedef enum TestName{
+	CMP_TEST = 0,
+	RF_TEST,
+	BOOT_TEST,
+	RESET,
+	RF_TEST_SUCCESS,
+	CMP_TEST_SUCCESS
+}TestName;
+
+typedef enum BootResult{
+	BOOT_PASS = 0,
+	BOOT_TARGET1_ERROR,
+	BOOT_TARGET2_ERROR
+}BootResult;
 
 static char LoraSaveCommand[128] = {0,};
 
@@ -154,6 +184,7 @@ static int LoraCommSend(unsigned char* in, unsigned int inLen, int target);
 int LoraTestCmp(int j, int target);
 int LoraTestInit(void);
 int LoraCommCompare(char* command, int list_num, char* value);
+int LoraLedSetting(int target, int test);
 int LoraBootStatus(void);
 int LoraCommRead(int num, uint8_t** read);
 int LoraTestStart(int target);

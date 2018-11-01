@@ -133,14 +133,19 @@ int main(void)
 				target_cmp_error = 1;
 				PRINTF("[TARGET 1] FAIL\r\n");
 			}
+			else if(ret == -2)
+			{
+				target_cmp_error = 2;
+				PRINTF("[TARGET 1] FAIL\r\n");
+			}
 			
 			edit = ret;
 			
-			if(edit == 0 && target_cmp_error != 1)
+			if(edit == 0 && target_cmp_error != 1 && target_cmp_error != 2)
 			{	
 				PRINTF("[TARGET 1] Complete\r\n");
 			}
-			else if(target_cmp_error != 1)
+			else if(target_cmp_error != 1 && target_cmp_error != 2)
 			{
 				PRINTF("\r\n\r\n%d command edit!!\r\n",edit);
 				PRINTF("[TARGET 1] Edit Complete\r\n\r\n");
@@ -154,17 +159,21 @@ int main(void)
 			PRINTF("[TARGET 2] START\r\n");
 			ret = LoraTestStart(target);
 			
-			if(target_cmp_error == 1 || ret == -1)
+			//target_cmp_error = 1 : target 1 DEVEUI error
+			//target_cmp_error = 2 : target 1 VER error
+			//ret = -1 : target 2 DEVEUI error
+			//ret = -2 : target 2 VER error
+			if(target_cmp_error == 1 || target_cmp_error == 2 || ret == -1 || ret == -2) //edit
 			{
-				GPIO_WritePin(GPIO2, GPIO_PIN_11, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 				
-				
-				if(target_cmp_error == 1 && ret == -1)
+				//target1 VER + target2 VER
+				if((target_cmp_error == 2 && ret == -2))
 				{
-					PRINTF("[TARGET 1] [TARGET 2] FAIL\r\n");
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] FAIL\r\n");
 					while(1)
 					{
 						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
@@ -173,8 +182,73 @@ int main(void)
 						DELAY_SleepMS(200);
 					}
 				}
+				//target1 VER + target2 DEVEUI
+				if((target_cmp_error == 2 && ret == -1))
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] FAIL\r\n");
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+				//target1 VER + target2 pass
+				if((target_cmp_error == 2 && ret == 0))
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] COMPLETE\r\n");
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+				//target1 DEVEUI + target2 DEVEUI
+				if((target_cmp_error == 1 && ret == -1))
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] FAIL\r\n");
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+				//target1 DEVEUI + target2 VER
+				if((target_cmp_error == 1 && ret == -2))
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] FAIL\r\n");
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+						DELAY_SleepMS(200);
+					}
+				}
+				//target1 DEVEUI + target2 pass
+				if((target_cmp_error == 1 && ret == 0))
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] COMPLETE\r\n");
+					while(1)
+					{
+						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						DELAY_SleepMS(200);
+					}
+				}
+				//target1 pass + target2 DEVEUI
 				else if(target_cmp_error == 0 && ret == -1)
 				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
 					PRINTF("[TARGET 2] FAIL\r\n");
 					while(1)
 					{
@@ -183,29 +257,39 @@ int main(void)
 						DELAY_SleepMS(200);
 					}
 				}
-				else if(target_cmp_error == 1 && ret != -1)
+				//target1 pass + target2 VER
+				else if(target_cmp_error == 0 && ret == -2)
 				{
-					PRINTF("[TARGET 1] FAIL\r\n");
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] FAIL\r\n");
 					while(1)
 					{
 						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
 						DELAY_SleepMS(200);
 					}
+				}
+				//target1 pass + target2 pass
+				else if(target_cmp_error == 0 && ret != -1 && ret != -2)
+				{
+					PRINTF("error code: %d%d\r\n", target_cmp_error, ret);
+					PRINTF("[TARGET 2] COMPLETE\r\n");
 				}
 				target_cmp_error = 0;
 			}
 			
 			edit = ret;
-			
-			if(edit == 0)
-			{				
-				PRINTF("[TARGET 2] Complete\r\n\r\n");
-			}
-			else
+			if(ret != -1 && ret != -2)
 			{
-				PRINTF("\r\n\r\n%d command edit!!\r\n",edit);
-				PRINTF("[TARGET 2] Edit Complete\r\n");
+				if(edit == 0)
+				{				
+					PRINTF("[TARGET 2] Complete\r\n\r\n");
+				}
+				else
+				{
+					PRINTF("\r\n\r\n%d command edit!!\r\n",edit);
+					PRINTF("[TARGET 2] Edit Complete\r\n");
+				}
 			}
 			
 			GPIO_WritePin(GPIO2, GPIO_PIN_12, 1);
@@ -222,6 +306,8 @@ int main(void)
 			{
 				while(1)
 				{
+					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
 					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
 					DELAY_SleepMS(200);
 				}
@@ -233,6 +319,8 @@ int main(void)
 			{
 				while(1)
 				{
+					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
 					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
 					DELAY_SleepMS(200);
 				}
@@ -257,6 +345,8 @@ int main(void)
 			{
 				while(1)
 				{
+					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
 					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
 					DELAY_SleepMS(200);
 				}
@@ -268,6 +358,8 @@ int main(void)
 			{
 				while(1)
 				{
+					GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+					GPIO_TogglePin(GPIO1, GPIO_PIN_13);
 					GPIO_TogglePin(GPIO2, GPIO_PIN_13);
 					DELAY_SleepMS(200);
 				}

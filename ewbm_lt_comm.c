@@ -561,7 +561,6 @@ int LoraTestCmp(int j, int target)
 	unsigned char ltCommReceiveTemp[64] = {0,};
 	unsigned char ptr[64] = {0, };
 	char value[128] = {0,};
-	char* Aptr = (char*)malloc(strlen(gLoraBuffer));
 	
 	memcpy(&LoraCommandvalue, (unsigned char*)LT_FLASH_SAVE_ADDR, sizeof(commandlist));
 	
@@ -575,36 +574,37 @@ int LoraTestCmp(int j, int target)
 		if(j == DEVEUI)
 		{
 			PRINTF("%s ERROR!!\r\n", LoraCommandName[j]);
-			GPIO_WritePin(GPIO2, GPIO_PIN_11, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_11, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 			
-			if(target == TARGET_1)
-				prob = 1;
-			else
-			{
-				if(prob != 0)
-				{
-					prob = 0;
-					while( 1 )
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
-				}
-				else
-				{
-					while( 1 )
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
-				}
-			}
+			return -1;
+//			if(target == TARGET_1)
+//				prob = 1;
+//			else
+//			{
+//				if(prob != 0)
+//				{
+//					prob = 0;
+//					while( 1 )
+//					{
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+//						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+//						DELAY_SleepMS(200);
+//					}
+//				}
+//				else
+//				{
+//					while( 1 )
+//					{
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+//						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+//						DELAY_SleepMS(200);
+//					}
+//				}
+//			}
 		}
 		if(j != DEVEUI)
 			PRINTF("%s <OK>\r\n",LoraCommandName[j]);
@@ -615,43 +615,43 @@ int LoraTestCmp(int j, int target)
 		if(j == VER)
 		{
 			PRINTF("%s ERROR!!\r\n", LoraCommandName[j]);
-			GPIO_WritePin(GPIO2, GPIO_PIN_11, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
-			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
+//			GPIO_WritePin(GPIO2, GPIO_PIN_14, 0);
 			
-			if(target == TARGET_1)
-				prob = 1;
-			else
-			{
-				if(prob != 0)
-				{
-					prob = 0;
-					while(1)
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
-				}
-				else
-				{
-					while(1)
-					{
-						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
-						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
-						DELAY_SleepMS(200);
-					}
-				}
-			}
+//			if(target == TARGET_1)
+//				prob = 1;
+//			else
+//			{
+//				if(prob != 0)
+//				{
+//					prob = 0;
+//					while(1)
+//					{
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_12);
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+//						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+//						DELAY_SleepMS(200);
+//					}
+//				}
+//				else
+//				{
+//					while(1)
+//					{
+//						GPIO_TogglePin(GPIO1, GPIO_PIN_13);
+//						GPIO_TogglePin(GPIO2, GPIO_PIN_12);
+//						DELAY_SleepMS(200);
+//					}
+//				}
+//			}
+//			
+			return -2;
 		}
 		else if(j == DEVEUI)
 		{
 			PRINTF("%s <OK>\r\n",LoraCommandName[j]);
 			goto LoraTestCmp;
 		}
-		
 		
 		memcpy(ltCommReceiveTemp, gLoraBuffer, strlen(value));
 		PRINTF("\r\n[Current Value]:%s\r\n%s Value Change: %s\r\n", ltCommReceiveTemp, LoraCommandName[j], value);
@@ -1037,6 +1037,8 @@ int LoraTestStart(int target)
 			fail_num++;
 		else if(ret == -1)
 			fail_num = -1;
+		else if(ret == -2)
+			fail_num = -2;
 	}
 	return fail_num;
 }

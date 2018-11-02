@@ -10,7 +10,7 @@
 
 int temp = TEST_WAIT;
 int type = 1;
-int target = TARGET_3;
+int target = DEFAULT;
 int gRecvLen = 0;
 uint8_t gBuffer[64] = { 0, };
 
@@ -18,7 +18,7 @@ static void uartRxInterrupt(void* param)
 {
 	uint8_t readed;
 	
-	if(target == TARGET_3)
+	if(target == DEFAULT)
 		gBuffer[gRecvLen++] = UART_Read(UART2);
 	else
 		readed = UART_Read(UART2);
@@ -139,7 +139,6 @@ int main(void)
 			}
 			
 			target = TARGET_2;
-			
 			PRINTF("\r\n\r\n");
 			DELAY_SleepMS(100);
 			
@@ -150,7 +149,7 @@ int main(void)
 			//target_cmp_error = 2 : target 1 VER error
 			//ret = -1 : target 2 DEVEUI error
 			//ret = -2 : target 2 VER error
-			if(target_cmp_error == TARGET1_DEVEUI_ERROR || target_cmp_error == TARGET1_VER_ERROR || ret == TARGET2_DEVEUI_ERROR || ret == TARGET2_VER_ERROR) //edit
+			if(target_cmp_error == TARGET1_DEVEUI_ERROR || target_cmp_error == TARGET1_VER_ERROR || ret == TARGET2_DEVEUI_ERROR || ret == TARGET2_VER_ERROR)
 			{
 				GPIO_WritePin(GPIO2, GPIO_PIN_12, 0);
 				GPIO_WritePin(GPIO2, GPIO_PIN_13, 0);
@@ -283,14 +282,14 @@ int main(void)
 			PRINTF("-----------------------------------------------\r\n");
 			PRINTF("                   TEST FINISH\r\n");
 			PRINTF("-----------------------------------------------\r\n\r\n\r\n");
-			target = TARGET_3;
+			target = DEFAULT;
 			ret = -1;
 			type = 1;
 			
 		}
 		else if(temp == TEST_WAIT)
 		{
-			target = TARGET_3;
+			target = DEFAULT;
 			PRINTF("\r\n-----------------------\r\n");
 			PRINTF("Please Typing...\r\n");
 			PRINTF("-----------------------\r\n");
@@ -316,6 +315,5 @@ main:
 		if(ret == EditType)
 			PRINTF("TYPE CHANGE\r\n");
 		__NOP();
-//		DELAY_SleepIO(10);
     }
 }

@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include "MS500.h"
 
+#define VERSION 2
+
 #pragma pack(push, 1)
 typedef struct commandlist {
     char PNM[128];          
@@ -81,7 +83,7 @@ typedef enum Edit_t{
 typedef enum Target_t{
 	TARGET_1 = 0,
 	TARGET_2,
-	TARGET_3,
+	DEFAULT,
 	TARGET_1_2
 }Target_t;
 

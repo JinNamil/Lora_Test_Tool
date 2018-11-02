@@ -603,19 +603,21 @@ int LoraTestInit(void)
 	GPIO_WritePin(GPIO1, GPIO_PIN_1, 1);
 	GPIO_WritePin(GPIO1, GPIO_PIN_2, 1);
 	
+	PRINTF("Lora_Test_Tool_v0.%d\r\n", VERSION);
 	memcpy(boot, (unsigned char*)LT_FLASH_BOOT_ADDR, 1);
 	
 	if(memcmp(boot, "1", 1) == 0)
-		PRINTF("Already Default Data in Flash\r\n");
+		PRINTF("[Already Default Data in Flash]\r\n");
 	else
 	{
 		LoraFlashInit();
-		PRINTF("Default Data in Flash\r\n");
+		PRINTF("[Default Data in Flash]\r\n");
 	}
 		
 	memcpy(&LoraCommandvalue, (unsigned char*)LT_FLASH_SAVE_ADDR, sizeof(commandlist));
 	
 	PRINTF("------------------Lora Init--------------------\r\n");
+	
 	for(int i = 0; i < Lora_command_MAX; i++)
 	{
 		LoraCommandMade(i, value);
